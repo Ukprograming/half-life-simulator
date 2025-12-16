@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>半減期シミュレーション（1年=1秒）</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --panel: #ffffff;
+            --card: #ffffff;
+
+            --ink: #0f172a;
+            --muted: #475569;
+
+            --line: #cbd5e1;
+            --grid: #e2e8f0;
+
+            --accent: #2563eb;
+            /* 実測線: 青 */
+            --theory: #ef4444;
+            /* 理論線: 赤 */
+
+            --success: #16a34a;
+            --danger: #dc2626;
+
+            --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans JP", sans-serif;
+        }
+
+        .app {
+            height: 100%;
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 12px;
+            padding: 12px;
+        }
+
+        .sidebar {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 14px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 0;
+        }
+
+        .main {
+            display: grid;
+            grid-template-rows: 1fr 280px;
+            gap: 12px;
+            min-height: 0;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 12px;
+            box-shadow: var(--shadow);
+            min-height: 0;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 6px 0;
+            letter-spacing: .02em;
+        }
+
+        .small {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 10px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: #ffffff;
+            color: var(--ink);
+            outline: none;
+        }
+
+        select:focus,
+        input:focus {
+            border-color: rgba(37, 99, 235, 0.55);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
+
+        .btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: #ffffff;
+            color: var(--ink);
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        button:hover {
+            background: #f1f5f9;
+        }
+
+        button:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+        }
+
+        .primary {
+            border-color: rgba(37, 99, 235, .55);
+            color: #1d4ed8;
+        }
+
+        .primary:hover {
+            background: rgba(37, 99, 235, .08);
+        }
+
+        .danger {
+            border-color: rgba(220, 38, 38, .55);
+            color: #b91c1c;
+        }
+
+        .danger:hover {
+            background: rgba(220, 38, 38, .08);
+        }
+
+        .kpi {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .kpi .tile {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 10px;
+            min-height: 78px;
+        }
+
+        .kpi .v {
+            font-size: 18px;
+            font-weight: 900;
+            margin-top: 4px;
+            color: var(--ink);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--grid);
+            margin: 4px 0;
+        }
+
+        .canvasWrap {
+            position: relative;
+            height: 100%;
+            min-height: 0;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 12px;
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            border: 1px solid var(--line);
+        }
+
+        .badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.88);
+            font-size: 12px;
+            color: var(--muted);
+            user-select: none;
+            backdrop-filter: blur(4px);
+        }
+
+        .badge strong {
+            color: var(--ink);
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            padding: 8px 10px;
+            border-radius: 12px;
+            border: 1px dashed var(--line);
+            background: rgba(255, 255, 255, 0.88);
+            font-size: 12px;
+            color: var(--muted);
+            user-select: none;
+            backdrop-filter: blur(4px);
+        }
+
+        .hint code {
+            color: #1d4ed8;
+            background: rgba(37, 99, 235, 0.10);
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+
+        @media (max-width: 980px) {
+            .app {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+            }
+
+            .main {
+                grid-template-rows: 1fr 260px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div>
+                <h1>放射性崩壊（半減期）シミュレーション</h1>
+                <div class="small">
+                    ルール：<strong>1年を1秒に換算</strong>して表示します（時間は「年」で進みます）。<br>
+                    崩壊は確率的（ランダム）に起きます。
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div>
+                <label for="isotope">同位体（半減期は実データ）</label>
+                <select id="isotope"></select>
+                <div class="small" id="isotopeInfo" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="row">
+                <div style="flex:1">
+                    <label for="count">原子核の個数</label>
+                    <input id="count" type="number" min="10" max="5000" step="10" value="400" />
+                    <div class="small">推奨：300〜1500</div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div style="flex:1">
+                    <label for="speed">時間倍率（年/秒）</label>
+                    <input id="speed" type="number" min="0.1" max="20" step="0.1" value="1" />
+                    <div class="small">基本は 1（=1年/秒）</div>
+                </div>
+            </div>
+
+            <div class="btns">
+                <button id="startBtn" class="primary">スタート</button>
+                <button id="resetBtn" class="danger">リセット</button>
+            </div>
+
+            <div class="kpi">
+                <div class="tile">
+                    <div class="small">経過時間</div>
+                    <div class="v" id="tYears">0.00 年</div>
+                    <div class="small" id="tSeconds">（0.00 秒相当）</div>
+                </div>
+                <div class="tile">
+                    <div class="small">残っている原子核</div>
+                    <div class="v" id="nAlive">0</div>
+                    <div class="small" id="nFrac">（0%）</div>
+                </div>
+            </div>
+
+            <div class="small">
+                条件を設定 → <strong>スタート</strong> → 変化を観察。<br>
+                <strong>リセット</strong>で開始前に戻ります。
+            </div>
+        </aside>
+
+        <main class="main">
+            <section class="card canvasWrap">
+                <div class="badge"><strong>原子核</strong>（ポップな核子の集まり）… 崩壊すると薄くなる</div>
+                <canvas id="nucleiCanvas"></canvas>
+                <div class="hint">
+                    半減期 <code>T1/2</code> 付近で、残存数がだいたい半分に近づきます（確率なので揺らぎます）。
+                </div>
+            </section>
+
+            <section class="card canvasWrap">
+                <div class="badge"><strong>残存数 N(t)</strong> の推移（実測＋理論）</div>
+                <canvas id="graphCanvas"></canvas>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        (() => {
+            // 半減期データ（単位：年へ統一）
+            const ISOTOPES = [
+                { key: "C-14", name: "炭素-14（^14C）", halfLifeYears: 5730, note: "約5,730年" },
+                { key: "Cs-137", name: "セシウム-137（^137Cs）", halfLifeYears: 30.17, note: "30.17年" },
+                { key: "I-131", name: "ヨウ素-131（^131I）", halfLifeYears: 8.0249 / 365.25, note: "約8.02日（短い）" },
+                { key: "U-238", name: "ウラン-238（^238U）", halfLifeYears: 4.463e9, note: "約44.63億年（非常に長い）" },
+                { key: "Co-60", name: "コバルト-60（^60Co）", halfLifeYears: 5.2714, note: "約5.27年" },
+                { key: "Ra-226", name: "ラジウム-226（^226Ra）", halfLifeYears: 1600, note: "約1,600年" },
+            ];
+
+            // DOM
+            const isotopeSel = document.getElementById("isotope");
+            const isotopeInfo = document.getElementById("isotopeInfo");
+            const countInp = document.getElementById("count");
+            const speedInp = document.getElementById("speed");
+            const startBtn = document.getElementById("startBtn");
+            const resetBtn = document.getElementById("resetBtn");
+
+            const tYearsEl = document.getElementById("tYears");
+            const tSecondsEl = document.getElementById("tSeconds");
+            const nAliveEl = document.getElementById("nAlive");
+            const nFracEl = document.getElementById("nFrac");
+
+            const nucleiCanvas = document.getElementById("nucleiCanvas");
+            const graphCanvas = document.getElementById("graphCanvas");
+            const nctx = nucleiCanvas.getContext("2d");
+            const gctx = graphCanvas.getContext("2d");
+
+            // 状態
+            let nuclei = []; // {x,y,alive,flash,nR,nucleons:[{dx,dy,t}]}
+            let N0 = 0;
+            let aliveCount = 0;
+
+            let running = false;
+            let elapsedYears = 0;
+            let lastTs = 0;
+
+            let lambda = 0;
+            let halfLifeYears = 1;
+
+            // グラフ
+            let seriesT = [];
+            let seriesN = [];
+            let graphMaxYears = 0;
+
+            // 軌跡用：記録間隔（年）
+            let recordEveryYears = 0.05;
+            let nextRecordAt = 0;
+
+            function cssVar(name, fallback) {
+                const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+                return v || fallback;
+            }
+
+            function populateIsotopes() {
+                isotopeSel.innerHTML = "";
+                for (const iso of ISOTOPES) {
+                    const opt = document.createElement("option");
+                    opt.value = iso.key;
+                    opt.textContent = iso.name;
+                    isotopeSel.appendChild(opt);
+                }
+                isotopeSel.value = "Cs-137";
+            }
+
+            function fmtYears(y) {
+                if (y >= 1e9) return (y / 1e9).toFixed(3) + "×10^9 年";
+                if (y >= 1e6) return (y / 1e6).toFixed(3) + "×10^6 年";
+                if (y >= 1e3) return (y / 1e3).toFixed(3) + "×10^3 年";
+                if (y >= 1) return y.toFixed(4) + " 年";
+                const days = y * 365.25;
+                if (days >= 1) return days.toFixed(3) + " 日（" + y.toExponential(3) + " 年）";
+                const hours = days * 24;
+                return hours.toFixed(3) + " 時間（" + y.toExponential(3) + " 年）";
+            }
+
+            function setIsotopeInfo() {
+                const iso = ISOTOPES.find(x => x.key === isotopeSel.value);
+                halfLifeYears = iso.halfLifeYears;
+                lambda = Math.log(2) / halfLifeYears;
+
+                isotopeInfo.innerHTML =
+                    `半減期 T1/2：<strong>${fmtYears(halfLifeYears)}</strong><br>` +
+                    `<span class="small">${iso.note}</span>`;
+            }
+
+            function resizeCanvasToDisplaySize(canvas) {
+                const dpr = Math.max(1, window.devicePixelRatio || 1);
+                const rect = canvas.getBoundingClientRect();
+                const w = Math.max(1, Math.floor(rect.width * dpr));
+                const h = Math.max(1, Math.floor(rect.height * dpr));
+                if (canvas.width !== w || canvas.height !== h) {
+                    canvas.width = w;
+                    canvas.height = h;
+                    return true;
+                }
+                return false;
+            }
+
+            // 原子核（核子の塊）を作る：ポップ寄り
+            function makeNucleusShape(baseR) {
+                const nucleonCount = Math.max(8, Math.min(14, Math.round(baseR / 2.2)));
+                const nucleons = [];
+                for (let i = 0; i < nucleonCount; i++) {
+                    const t = Math.random() < 0.5 ? "p" : "n";
+                    const a = Math.random() * Math.PI * 2;
+                    const rr = Math.random() * baseR * 0.45;
+                    nucleons.push({
+                        dx: Math.cos(a) * rr,
+                        dy: Math.sin(a) * rr,
+                        t
+                    });
+                }
+                return nucleons;
+            }
+
+            function initNuclei() {
+                resizeCanvasToDisplaySize(nucleiCanvas);
+
+                const n = clampInt(parseInt(countInp.value || "400", 10), 10, 5000);
+                countInp.value = String(n);
+
+                const w = nucleiCanvas.width, h = nucleiCanvas.height;
+                nuclei = [];
+
+                // 原子核サイズ：大きめ（ポップ向け）
+                const density = n / Math.max(1, (w * h) / (320 * 320));
+                const baseR = clampFloat(28 / Math.sqrt(Math.max(0.6, density)), 18, 30);
+
+                for (let i = 0; i < n; i++) {
+                    const x = Math.random() * (w - 60) + 30;
+                    const y = Math.random() * (h - 60) + 30;
+                    const nucleons = makeNucleusShape(baseR);
+                    nuclei.push({
+                        x, y,
+                        alive: true,
+                        flash: 0,
+                        nR: baseR,
+                        nucleons
+                    });
+                }
+                N0 = n;
+                aliveCount = n;
+
+                elapsedYears = 0;
+                seriesT = [0];
+                seriesN = [aliveCount];
+
+                graphMaxYears = Math.max(halfLifeYears * 5, halfLifeYears * 2, 1);
+
+                recordEveryYears = Math.max(graphMaxYears / 400, graphMaxYears * 0.002, 0.001);
+                nextRecordAt = recordEveryYears;
+
+                updateKPIs();
+                drawAll();
+            }
+
+            function resetAll() {
+                running = false;
+                startBtn.textContent = "スタート";
+                startBtn.disabled = false;
+                lastTs = 0;
+                initNuclei();
+            }
+
+            function clampInt(v, lo, hi) {
+                if (!Number.isFinite(v)) v = lo;
+                v = Math.round(v);
+                return Math.min(hi, Math.max(lo, v));
+            }
+            function clampFloat(v, lo, hi) {
+                if (!Number.isFinite(v)) v = lo;
+                return Math.min(hi, Math.max(lo, v));
+            }
+
+            // 崩壊確率：p = 1 - exp(-lambda*dt)
+            function stepDecay(dtYears) {
+                if (aliveCount <= 0) return;
+                const p = 1 - Math.exp(-lambda * dtYears);
+                if (p <= 0) return;
+
+                for (let i = 0; i < nuclei.length; i++) {
+                    const nu = nuclei[i];
+                    if (!nu.alive) continue;
+                    if (Math.random() < p) {
+                        nu.alive = false;
+                        nu.flash = 1.0;
+                        aliveCount--;
+                    }
+                }
+            }
+
+            // 原子核描画（明るい背景・格子も薄い）
+            function drawNuclei() {
+                resizeCanvasToDisplaySize(nucleiCanvas);
+                const w = nucleiCanvas.width, h = nucleiCanvas.height;
+                nctx.clearRect(0, 0, w, h);
+
+                const gridCol = cssVar('--grid', '#e2e8f0');
+                const ink = cssVar('--ink', '#0f172a');
+
+                // 薄い格子（太めで見やすい）
+                nctx.save();
+                nctx.strokeStyle = gridCol;
+                nctx.globalAlpha = 1;
+                nctx.lineWidth = 2;
+                const grid = Math.max(30, Math.floor(Math.min(w, h) / 12));
+                for (let x = 0; x < w; x += grid) {
+                    nctx.beginPath(); nctx.moveTo(x, 0); nctx.lineTo(x, h); nctx.stroke();
+                }
+                for (let y = 0; y < h; y += grid) {
+                    nctx.beginPath(); nctx.moveTo(0, y); nctx.lineTo(w, y); nctx.stroke();
+                }
+                nctx.restore();
+
+                for (const nu of nuclei) {
+                    const R = nu.nR;
+                    const aliveAlpha = nu.alive ? 1.0 : 0.25;
+
+                    // 外側の円（明るい黄色＋白縁）
+                    nctx.save();
+                    nctx.globalAlpha = aliveAlpha;
+                    nctx.fillStyle = "#fde68a";
+                    nctx.beginPath();
+                    nctx.arc(nu.x, nu.y, R, 0, Math.PI * 2);
+                    nctx.fill();
+                    nctx.restore();
+
+                    nctx.save();
+                    nctx.globalAlpha = aliveAlpha;
+                    nctx.strokeStyle = "#ffffff";
+                    nctx.lineWidth = 4; // 太く
+                    nctx.beginPath();
+                    nctx.arc(nu.x, nu.y, R, 0, Math.PI * 2);
+                    nctx.stroke();
+                    nctx.restore();
+
+                    // 核子（大きめ・パステル）
+                    const nucleonR = R * 0.23;
+                    for (const p of nu.nucleons) {
+                        nctx.save();
+                        nctx.globalAlpha = aliveAlpha;
+                        nctx.fillStyle = (p.t === "p") ? "rgb(248,113,113)" : "rgb(147,197,253)";
+                        nctx.beginPath();
+                        nctx.arc(nu.x + p.dx, nu.y + p.dy, nucleonR, 0, Math.PI * 2);
+                        nctx.fill();
+
+                        // 核子の白フチ（ポップ感）
+                        nctx.strokeStyle = "rgba(255,255,255,0.9)";
+                        nctx.lineWidth = 2;
+                        nctx.stroke();
+                        nctx.restore();
+                    }
+
+                    // ハイライト（シール感）
+                    nctx.save();
+                    nctx.globalAlpha = 0.28 * aliveAlpha;
+                    nctx.fillStyle = "#ffffff";
+                    nctx.beginPath();
+                    nctx.arc(nu.x - R * 0.3, nu.y - R * 0.3, R * 0.45, 0, Math.PI * 2);
+                    nctx.fill();
+                    nctx.restore();
+
+                    // 崩壊フラッシュ
+                    if (nu.flash > 0) {
+                        nctx.save();
+                        nctx.globalAlpha = nu.flash;
+                        nctx.strokeStyle = "#f59e0b";
+                        nctx.lineWidth = 5;
+                        nctx.beginPath();
+                        nctx.arc(nu.x, nu.y, R * 1.85, 0, Math.PI * 2);
+                        nctx.stroke();
+                        nctx.restore();
+                        nu.flash -= 0.08;
+                    }
+                }
+
+                // 表示ガイド
+                nctx.save();
+                nctx.fillStyle = ink;
+                nctx.globalAlpha = 0.8;
+                nctx.font = `${Math.max(12, Math.floor(w / 85))}px system-ui`;
+                nctx.fillText("生存：色付き / 崩壊：薄く表示", 14, h - 16);
+                nctx.restore();
+            }
+
+            // グラフ描画：理論曲線（点線）＋余白調整＋太線化＋明るい配色
+            function drawGraph() {
+                resizeCanvasToDisplaySize(graphCanvas);
+                const w = graphCanvas.width, h = graphCanvas.height;
+                gctx.clearRect(0, 0, w, h);
+
+                // ★余白を増やして「タイトル・軸名・目盛」が重ならないようにする
+                const padL = 74, padR = 26, padT = 52, padB = 58;
+                const innerW = w - padL - padR;
+                const innerH = h - padT - padB;
+
+                const ink = cssVar('--ink', '#0f172a');
+                const muted = cssVar('--muted', '#475569');
+                const gridCol = cssVar('--grid', '#e2e8f0');
+                const lineCol = cssVar('--accent', '#2563eb');
+                const theoryCol = cssVar('--theory', '#ef4444');
+
+                // 背景を白く
+                gctx.save();
+                gctx.fillStyle = "#ffffff";
+                gctx.fillRect(0, 0, w, h);
+                gctx.restore();
+
+                // スケール
+                const maxX = Math.max(graphMaxYears, 1e-9);
+                const maxY = Math.max(N0, 1);
+
+                // グリッド（太め）
+                gctx.save();
+                gctx.strokeStyle = gridCol;
+                gctx.lineWidth = 2.5; // 太く
+                const xTicks = 6, yTicks = 4;
+                for (let i = 0; i <= xTicks; i++) {
+                    const x = padL + innerW * (i / xTicks);
+                    gctx.beginPath(); gctx.moveTo(x, padT); gctx.lineTo(x, padT + innerH); gctx.stroke();
+                }
+                for (let i = 0; i <= yTicks; i++) {
+                    const y = padT + innerH * (i / yTicks);
+                    gctx.beginPath(); gctx.moveTo(padL, y); gctx.lineTo(padL + innerW, y); gctx.stroke();
+                }
+                gctx.restore();
+
+                // 軸（太く）
+                gctx.save();
+                gctx.strokeStyle = ink;
+                gctx.lineWidth = 4.5;
+                gctx.beginPath();
+                gctx.moveTo(padL, padT);
+                gctx.lineTo(padL, padT + innerH);
+                gctx.lineTo(padL + innerW, padT + innerH);
+                gctx.stroke();
+                gctx.restore();
+
+                // タイトル（上余白に描く）
+                gctx.save();
+                gctx.fillStyle = ink;
+                gctx.font = `800 ${Math.max(14, Math.floor(w / 70))}px system-ui`;
+                gctx.textAlign = "center";
+                gctx.textBaseline = "middle";
+                gctx.fillText("残存数 N(t) の推移", padL + innerW / 2, padT - 26);
+                gctx.restore();
+
+                // 軸名（余白に描く）
+                gctx.save();
+                gctx.fillStyle = muted;
+                gctx.font = `${Math.max(12, Math.floor(w / 92))}px system-ui`;
+                gctx.textAlign = "center";
+                gctx.textBaseline = "middle";
+                gctx.fillText("t（年）", padL + innerW / 2, padT + innerH + 36);
+
+                gctx.translate(26, padT + innerH / 2);
+                gctx.rotate(-Math.PI / 2);
+                gctx.fillText("N（残存数）", 0, 0);
+                gctx.restore();
+
+                // 実測（シミュレーション）曲線：太く
+                if (seriesT.length >= 2) {
+                    gctx.save();
+                    gctx.strokeStyle = lineCol;
+                    gctx.lineWidth = 4.5; // 太く
+                    gctx.lineJoin = "round";
+                    gctx.lineCap = "round";
+                    gctx.setLineDash([]);
+
+                    gctx.beginPath();
+                    for (let i = 0; i < seriesT.length; i++) {
+                        const x = padL + innerW * (seriesT[i] / maxX);
+                        const y = padT + innerH * (1 - (seriesN[i] / maxY));
+                        if (i === 0) gctx.moveTo(x, y);
+                        else gctx.lineTo(x, y);
+                    }
+                    gctx.stroke();
+                    gctx.restore();
+                }
+
+                // ★理論曲線（点線）: N(t) = N0 * exp(-lambda t)
+                gctx.save();
+                gctx.strokeStyle = theoryCol;
+                gctx.lineWidth = 3.8;
+                gctx.lineJoin = "round";
+                gctx.lineCap = "round";
+                gctx.setLineDash([10, 8]); // 点線
+
+                const samples = 320;
+                gctx.beginPath();
+                for (let i = 0; i <= samples; i++) {
+                    const t = maxX * (i / samples);
+                    const nTheory = N0 * Math.exp(-lambda * t);
+                    const x = padL + innerW * (t / maxX);
+                    const y = padT + innerH * (1 - (nTheory / maxY));
+                    if (i === 0) gctx.moveTo(x, y);
+                    else gctx.lineTo(x, y);
+                }
+                gctx.stroke();
+                gctx.restore();
+
+                // 現在点
+                const curX = padL + innerW * (elapsedYears / maxX);
+                const curY = padT + innerH * (1 - (aliveCount / maxY));
+                gctx.save();
+                gctx.fillStyle = ink;
+                gctx.beginPath();
+                gctx.arc(curX, curY, 5.5, 0, Math.PI * 2);
+                gctx.fill();
+                gctx.restore();
+
+                // 目盛値（見やすく）
+                gctx.save();
+                gctx.fillStyle = muted;
+                gctx.font = `${Math.max(12, Math.floor(w / 95))}px system-ui`;
+
+                // y側
+                gctx.textAlign = "right";
+                gctx.textBaseline = "middle";
+                gctx.fillText(String(N0), padL - 12, padT);
+                gctx.fillText(String(Math.round(N0 / 2)), padL - 12, padT + innerH / 2);
+                gctx.fillText("0", padL - 12, padT + innerH);
+
+                // x側
+                gctx.textAlign = "center";
+                gctx.textBaseline = "top";
+                gctx.fillText("0", padL, padT + innerH + 12);
+                gctx.fillText(formatAxis(maxX / 2), padL + innerW / 2, padT + innerH + 12);
+                gctx.fillText(formatAxis(maxX), padL + innerW, padT + innerH + 12);
+
+                // 凡例（右上）
+                const lx = padL + innerW - 200;
+                const ly = padT + 16;
+                gctx.textAlign = "left";
+                gctx.textBaseline = "middle";
+                gctx.fillStyle = muted;
+                gctx.fillText("実測（シミュレーション）", lx + 34, ly);
+                gctx.fillText("理論（指数減衰）", lx + 34, ly + 24);
+
+                // 凡例の線
+                gctx.strokeStyle = lineCol;
+                gctx.lineWidth = 4.5;
+                gctx.setLineDash([]);
+                gctx.beginPath(); gctx.moveTo(lx, ly); gctx.lineTo(lx + 28, ly); gctx.stroke();
+
+                gctx.strokeStyle = theoryCol;
+                gctx.lineWidth = 3.8;
+                gctx.setLineDash([10, 8]);
+                gctx.beginPath(); gctx.moveTo(lx, ly + 24); gctx.lineTo(lx + 28, ly + 24); gctx.stroke();
+
+                gctx.restore();
+            }
+
+            function formatAxis(years) {
+                if (years >= 1e9) return (years / 1e9).toFixed(1) + "G";
+                if (years >= 1e6) return (years / 1e6).toFixed(1) + "M";
+                if (years >= 1e3) return (years / 1e3).toFixed(1) + "k";
+                if (years >= 10) return years.toFixed(0);
+                if (years >= 1) return years.toFixed(1);
+                return years.toExponential(1);
+            }
+
+            function updateKPIs() {
+                tYearsEl.textContent = `${elapsedYears.toFixed(2)} 年`;
+                tSecondsEl.textContent = `（${(elapsedYears / Math.max(0.0001, parseFloat(speedInp.value || "1"))).toFixed(2)} 秒相当）`;
+
+                nAliveEl.textContent = String(aliveCount);
+                const frac = (aliveCount / Math.max(1, N0)) * 100;
+                nFracEl.textContent = `（${frac.toFixed(1)}%）`;
+            }
+
+            function drawAll() {
+                drawNuclei();
+                drawGraph();
+            }
+
+            function loop(ts) {
+                if (!running) {
+                    drawAll();
+                    return;
+                }
+                if (!lastTs) lastTs = ts;
+                const dtSec = Math.min(0.05, (ts - lastTs) / 1000);
+                lastTs = ts;
+
+                const speed = Math.max(0.0001, parseFloat(speedInp.value || "1")); // 年/秒
+                const dtYears = dtSec * speed;
+
+                elapsedYears += dtYears;
+
+                if (elapsedYears > graphMaxYears * 0.98) {
+                    graphMaxYears *= 1.6;
+                    recordEveryYears = Math.max(graphMaxYears / 400, graphMaxYears * 0.002, 0.001);
+                }
+
+                stepDecay(dtYears);
+
+                // 一定の年刻みで確実にpushして「軌跡」を作る
+                if (elapsedYears >= nextRecordAt) {
+                    seriesT.push(elapsedYears);
+                    seriesN.push(aliveCount);
+                    nextRecordAt += recordEveryYears;
+                } else {
+                    // 最後の点だけ更新
+                    seriesT[seriesT.length - 1] = elapsedYears;
+                    seriesN[seriesN.length - 1] = aliveCount;
+                }
+
+                updateKPIs();
+                drawAll();
+
+                if (aliveCount <= 0) {
+                    running = false;
+                    startBtn.textContent = "スタート";
+                    startBtn.disabled = false;
+                } else {
+                    requestAnimationFrame(loop);
+                }
+            }
+
+            startBtn.addEventListener("click", () => {
+                if (!running) {
+                    running = true;
+                    startBtn.textContent = "実行中…";
+                    startBtn.disabled = true;
+                    lastTs = 0;
+                    requestAnimationFrame(loop);
+                }
+            });
+
+            resetBtn.addEventListener("click", () => resetAll());
+
+            isotopeSel.addEventListener("change", () => {
+                setIsotopeInfo();
+                resetAll();
+            });
+
+            countInp.addEventListener("change", () => resetAll());
+            speedInp.addEventListener("change", () => updateKPIs());
+            window.addEventListener("resize", () => drawAll());
+
+            // 起動
+            populateIsotopes();
+            setIsotopeInfo();
+            resizeCanvasToDisplaySize(nucleiCanvas);
+            resizeCanvasToDisplaySize(graphCanvas);
+            resetAll();
+        })();
+    </script>
+</body>
+
+</html>
